@@ -6,8 +6,8 @@
       url = "file+file:///dev/null";
       flake = false;
     };
-    nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
-    devenv.url = "github:cachix/devenv";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    de.url = "github:cachix/devenv";
     flake-parts.url = "github:hercules-ci/flake-parts";
     nix2container = {
       url = "github:nlewo/nix2container";
@@ -29,7 +29,7 @@
       systems = ["x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin"];
 
       imports = [
-        inputs.devenv.flakeModule
+        inputs.de.flakeModule
         inputs.flake-parts.flakeModules.easyOverlay
       ];
 
