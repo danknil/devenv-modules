@@ -2,17 +2,11 @@
   description = "DankNil's modules for devenv and overlay for dev packages";
 
   inputs = {
-    devenv-root = {
-      url = "file+file:///dev/null";
-      flake = false;
-    };
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    de.url = "github:cachix/devenv";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    nix2container = {
-      url = "github:nlewo/nix2container";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    devenv.url = "github:cachix/devenv";
+
+    # System list
+    systems.url = "github:nix-systems/default";
   };
 
   nixConfig = {
@@ -21,45 +15,57 @@
   };
 
   outputs = {
-    flake-parts,
-    devenv-root,
+    self,
+    nixpkgs,
+    devenv,
+    systems,
     ...
-  } @ inputs:
-    flake-parts.lib.mkFlake {inherit inputs;} {
-      systems = ["x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin"];
+  } @ inputs: let
+    inherit (self) outputs;
+    inherit (nixpkgs) lib;
 
-      imports = [
-        inputs.de.flakeModule
-        inputs.flake-parts.flakeModules.easyOverlay
-      ];
+    forAllSystems = nixpkgs.lib.genAttrs (import systems);
+  in {
+    # Your custom packages
+    # Accessible through 'nix build', 'nix shell', etc
+    packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
 
-      flake.devenvModules = import ./modules;
+    # Formatter for your nix files, available through 'nix fmt'
+    # Other options beside 'alejandra' include 'nixpkgs-fmt'
+    formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.alejandra);
 
-      perSystem = {
-        config,
-        self',
-        inputs',
-        pkgs,
-        system,
-        ...
-      }: {
-        packages = import ./packages pkgs;
-
-        overlayAttrs = {
-          inherit (config.packages) tomcat7;
-        };
-
-        devenv.shells.default = {
-          # devenv.root = let
-          #   devenvRootFileContent = builtins.readFile devenv-root.outPath;
-          # in
-          #   pkgs.lib.mkIf (devenvRootFileContent != "") devenvRootFileContent;
-          packages = [pkgs.hello];
-
-          enterShell = ''
-            hello
-          '';
-        };
+    # Your custom packages and modifications, exported as overlays
+    overlays = {
+      # This one brings our custom packages from the 'pkgs' directory
+      default = final: _prev: {
+        custom = import ./pkgs final.pkgs;
       };
     };
+
+
+    # my devenv modules
+    devenvModules = import ./modules;
+
+    # default shell for development
+    devShells = forAllSystems (system: {
+      default = inputs.devenv.lib.mkShell {
+        inherit inputs;
+        pkgs = nixpkgs.legacyPackages.${system};
+        modules = [
+          ({
+            pkgs,
+            config,
+            ...
+          }: {
+            packages = [pkgs.git];
+            languages.nix.enable = true;
+            pre-commit.hooks.alejandra = {
+              enable = true;
+              fail_fast = true;
+            };
+          })
+        ];
+      };
+    });
+  };
 }
