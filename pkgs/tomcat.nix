@@ -1,23 +1,29 @@
 {
-  version,
-  src,
-}: {
-  lib,
-  stdenvNoCC,
   fetchurl,
-  nixosTests,
-  testers,
+  gitUpdater,
   jre,
+  lib,
+  nixosTests,
+  stdenvNoCC,
+  testers,
 }: let
-  tomcat = {
+  common = {
     version,
-    src,
+    hash,
   }:
     stdenvNoCC.mkDerivation (finalAttrs: {
       pname = "apache-tomcat";
-      inherit version src;
+      inherit version;
 
-      outputs = ["out" "webapps"];
+      src = fetchurl {
+        url = "mirror://apache/tomcat/tomcat-${lib.versions.major version}/v${version}/bin/apache-tomcat-${version}.tar.gz";
+        inherit hash;
+      };
+
+      outputs = [
+        "out"
+        "webapps"
+      ];
       installPhase = ''
         mkdir $out
         mv * $out
@@ -25,29 +31,33 @@
         mv $out/webapps $webapps/
       '';
 
-      passthru.tests = {
-        inherit (nixosTests) tomcat;
-        version = testers.testVersion {
-          package = finalAttrs.finalPackage;
-          command = "JAVA_HOME=${jre} ${finalAttrs.finalPackage}/bin/version.sh";
+      passthru = {
+        updateScript = gitUpdater {
+          url = "https://github.com/apache/tomcat.git";
+          allowedVersions = "^${lib.versions.major version}\\.";
+          ignoredVersions = "-M.*";
+        };
+        tests = {
+          inherit (nixosTests) tomcat;
+          version = testers.testVersion {
+            package = finalAttrs.finalPackage;
+            command = "JAVA_HOME=${jre} ${finalAttrs.finalPackage}/bin/version.sh";
+          };
         };
       };
 
-      meta = with lib; {
+      meta = {
         homepage = "https://tomcat.apache.org/";
         description = "Implementation of the Java Servlet and JavaServer Pages technologies";
-        inherit (jre.meta) platforms;
-        maintainers = with maintainers; [anthonyroussel];
-        license = [licenses.asl20];
-        sourceProvenance = with sourceTypes; [binaryBytecode];
+        platforms = jre.meta.platforms;
+        maintainers = with lib.maintainers; [anthonyroussel];
+        license = lib.licenses.asl20;
+        sourceProvenance = with lib.sourceTypes; [binaryBytecode];
       };
     });
 in {
-  tomcat7 = tomcat rec {
+  tomcat7 = common {
     version = "7.0.109";
-    src = fetchurl {
-      url = "https://archive.apache.org/dist/tomcat/tomcat-${lib.version.major version}/v${version}/bin/apache-tomcat-${version}.tar.gz";
-      hash = "";
-    };
+    hash = "sha256-6/6wUebaJLzlg6QQVDm/2v79x8W91kLbKrB+BWIRyzE=";
   };
 }

@@ -1,5 +1,10 @@
-{...}: let
-  tomcat = import ./tomcat.nix;
+{
+  callPackage,
+  callPackages,
+  fetchurl,
+  lib,
+  ...
+}: let
 in {
-  inherit (tomcat) tomcat7;
+  inherit (callPackages (import ./tomcat.nix) {}) tomcat7;
 }

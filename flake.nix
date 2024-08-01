@@ -49,14 +49,17 @@
     devShells = forAllSystems (system: {
       default = inputs.devenv.lib.mkShell {
         inherit inputs;
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [outputs.overlays.default];
+        };
         modules = [
           ({
             pkgs,
             config,
             ...
           }: {
-            packages = [pkgs.git];
+            packages = [pkgs.git pkgs.custom.tomcat7];
             languages.nix.enable = true;
             pre-commit.hooks.alejandra = {
               enable = true;
