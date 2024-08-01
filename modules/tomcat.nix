@@ -8,7 +8,7 @@
 in {
   options.services.tomcat = {
     enable = lib.mkEnableOption "Enable tomcat";
-    package = lib.mkPackageOption pkgs "tomcat7" {
+    package = lib.mkPackageOption pkgs "custom.tomcat7" {
       example = "tomcat10";
     };
     baseDir = lib.mkOption {
