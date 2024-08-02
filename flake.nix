@@ -45,6 +45,7 @@
         };
 
         devenv.shells.default = {
+          containers = pkgs.lib.mkForce {};
           packages = [final.tomcat7];
           languages.nix.enable = true;
           pre-commit.hooks.alejandra = {
