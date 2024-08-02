@@ -17,19 +17,31 @@
     devenv,
     ...
   } @ inputs:
-    flake-parts.lib.mkFlake {inherit inputs;} {
+    flake-parts.lib.mkFlake {inherit inputs;} ({
+      withSystem,
+      flake-parts-lib,
+      ...
+    }: let
+      inherit (flake-parts-lib) importApply;
+      flakeModules.default = importApply ./flake-module.nix {inherit withSystem;};
+    in {
       imports = [
         devenv.flakeModule
+        flakeModules.default
         flake-parts.flakeModules.easyOverlay
       ];
-      flake = {
-        devenvModules = import ./modules;
-      };
+
       systems = [
         # systems for which you want to build the `perSystem` attributes
         "x86_64-linux"
         # ...
       ];
+
+      flake = {
+        devenvModules = import ./modules;
+        inherit flakeModules;
+      };
+
       perSystem = {
         config,
         pkgs,
@@ -54,5 +66,5 @@
           };
         };
       };
-    };
+    });
 }
