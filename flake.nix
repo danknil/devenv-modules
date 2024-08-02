@@ -3,10 +3,8 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
     devenv.url = "github:cachix/devenv";
-
-    # System list
-    systems.url = "github:nix-systems/default";
   };
 
   nixConfig = {
@@ -15,59 +13,45 @@
   };
 
   outputs = {
-    self,
-    nixpkgs,
+    flake-parts,
     devenv,
-    systems,
     ...
-  } @ inputs: let
-    inherit (self) outputs;
-    inherit (nixpkgs) lib;
+  } @ inputs:
+    flake-parts.lib.mkFlake {inherit inputs;} {
+      imports = [
+        devenv.flakeModule
+        flake-parts.flakeModules.easyOverlay
+      ];
+      flake = {
+        devenvModules = import ./modules;
+      };
+      systems = [
+        # systems for which you want to build the `perSystem` attributes
+        "x86_64-linux"
+        # ...
+      ];
+      perSystem = {
+        config,
+        pkgs,
+        final,
+        ...
+      }: {
+        formatter = pkgs.alejandra;
 
-    forAllSystems = nixpkgs.lib.genAttrs (import systems);
-  in {
-    # Your custom packages
-    # Accessible through 'nix build', 'nix shell', etc
-    packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
+        packages = import ./pkgs pkgs;
 
-    # Formatter for your nix files, available through 'nix fmt'
-    # Other options beside 'alejandra' include 'nixpkgs-fmt'
-    formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.alejandra);
+        overlayAttrs = {
+          inherit (config.packages) tomcat7;
+        };
 
-    # Your custom packages and modifications, exported as overlays
-    overlays = {
-      # This one brings our custom packages from the 'pkgs' directory
-      default = final: _prev: {
-        custom = import ./pkgs final.pkgs;
+        devenv.shells.default = {
+          packages = [final.tomcat7];
+          languages.nix.enable = true;
+          pre-commit.hooks.alejandra = {
+            enable = true;
+            fail_fast = true;
+          };
+        };
       };
     };
-
-    # my devenv modules
-    devenvModules = import ./modules;
-
-    # default shell for development
-    devShells = forAllSystems (system: {
-      default = inputs.devenv.lib.mkShell {
-        inherit inputs;
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [outputs.overlays.default];
-        };
-        modules = [
-          ({
-            pkgs,
-            config,
-            ...
-          }: {
-            packages = [pkgs.git pkgs.custom.tomcat7];
-            languages.nix.enable = true;
-            pre-commit.hooks.alejandra = {
-              enable = true;
-              fail_fast = true;
-            };
-          })
-        ];
-      };
-    });
-  };
 }
